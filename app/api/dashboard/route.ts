@@ -2,9 +2,23 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../lib/db'; 
 import { computeMetrics, computeRiskBreakdown } from '../../lib/risk-engine';
 import { getPreviousReportingMonth, normalizeReportingMonth } from '../../lib/months';
-import type { Prisma, School, MonthlyRecord } from '@prisma/client';
 
-type DashboardRecord = MonthlyRecord & { school: School };
+type DashboardRecord = {
+  participating: boolean;
+  evidenceSubmitted: boolean;
+  enrollment: number;
+  attendance: number;
+  school?: {
+    district: string | null;
+  } | null;
+};
+
+type DashboardWhereClause = {
+  month?: string;
+  school?: {
+    district: string;
+  };
+};
 
 function roundDelta(value: number) {
   return Math.round(value * 10) / 10;
@@ -17,7 +31,7 @@ export async function GET(request: Request) {
   const district = searchParams.get('district');
 
   try {
-    const whereClause: Prisma.MonthlyRecordWhereInput = {};
+    const whereClause: DashboardWhereClause = {};
     
     if (month) {
       whereClause.month = month;
@@ -28,7 +42,7 @@ export async function GET(request: Request) {
     }
     
     const previousMonth = getPreviousReportingMonth(month);
-    const previousWhereClause: Prisma.MonthlyRecordWhereInput | undefined = previousMonth
+    const previousWhereClause: DashboardWhereClause | undefined = previousMonth
       ? {
           ...whereClause,
           month: previousMonth,
