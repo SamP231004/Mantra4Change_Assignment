@@ -1,0 +1,50 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+model School {
+    id         String          @id @default(uuid())
+    schoolCode String          @unique
+    district   String
+    block      String
+    records    MonthlyRecord[]
+}
+
+model MonthlyRecord {
+    id       String  @id @default(uuid())
+    schoolId String
+    school   School  @relation(fields: [schoolId], references: [id])
+    month    String // "2025-07", "2025-08", "2025-09"
+    grade    String?
+    subject  String?
+
+    // Implementation Data
+    participating     Boolean @default(false)
+    evidenceSubmitted Boolean @default(false)
+    enrollment        Int     @default(0)
+    attendance        Int     @default(0)
+
+    @@unique([schoolId, month])
+}
+
+model Grant {
+    id             String           @id @default(uuid())
+    grantLabel     String           @unique
+    totalBudget    Float
+    utilizedBudget Float
+    milestones     GrantMilestone[]
+}
+
+model GrantMilestone {
+    id          String  @id @default(uuid())
+    grantId     String
+    grant       Grant   @relation(fields: [grantId], references: [id])
+    month       String
+    description String
+    status      String // "Complete", "In Progress", "At Risk"
+    evidenceUrl String?
+}
