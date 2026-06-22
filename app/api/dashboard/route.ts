@@ -20,6 +20,10 @@ type DashboardWhereClause = {
   };
 };
 
+type SchoolDistrict = {
+  district: string | null;
+};
+
 function roundDelta(value: number) {
   return Math.round(value * 10) / 10;
 }
@@ -49,23 +53,26 @@ export async function GET(request: Request) {
         }
       : undefined;
 
-    const records = await prisma.monthlyRecord.findMany({
+    const records = (await prisma.monthlyRecord.findMany({
       where: whereClause,
       include: { school: true },
-    });
+    })) as DashboardRecord[];
 
     const previousRecords = previousWhereClause
-      ? await prisma.monthlyRecord.findMany({
+      ? ((await prisma.monthlyRecord.findMany({
           where: previousWhereClause,
           include: { school: true },
-        })
+        })) as DashboardRecord[])
       : [];
 
-    const allSchools = await prisma.school.findMany({
+    const allSchools = (await prisma.school.findMany({
       select: { district: true },
       distinct: ['district']
-    });
-    const availableDistricts = allSchools.map(s => s.district).filter(Boolean).sort();
+    })) as SchoolDistrict[];
+    const availableDistricts = allSchools
+      .map((school) => school.district)
+      .filter((district): district is string => Boolean(district))
+      .sort();
 
     const metrics = computeMetrics(records);
     const previousMetrics = previousRecords.length > 0 ? computeMetrics(previousRecords) : null;
@@ -79,17 +86,17 @@ export async function GET(request: Request) {
       : null;
     const riskBreakdown = computeRiskBreakdown(records);
 
-    const districtGroups = records.reduce((acc: Record<string, DashboardRecord[]>, record) => {
+    const districtGroups = records.reduce((acc: Record<string, DashboardRecord[]>, record: DashboardRecord) => {
       const d = record.school?.district || 'Unknown District';
       if (!acc[d]) acc[d] = [];
       acc[d].push(record);
       return acc;
     }, {});
 
-    const districtPerformance = Object.keys(districtGroups).map(d => ({
-      district: d,
-      metrics: computeMetrics(districtGroups[d]),
-      riskBreakdown: computeRiskBreakdown(districtGroups[d])
+    const districtPerformance = Object.keys(districtGroups).map((districtName) => ({
+      district: districtName,
+      metrics: computeMetrics(districtGroups[districtName]),
+      riskBreakdown: computeRiskBreakdown(districtGroups[districtName])
     })).sort((a, b) => b.metrics.attendancePercentage - a.metrics.attendancePercentage);
 
     return NextResponse.json({
